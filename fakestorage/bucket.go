@@ -46,14 +46,31 @@ func getBucketAttrsToUpdate(body io.ReadCloser) backend.BucketAttrs {
 	var data struct {
 		DefaultEventBasedHold bool             `json:"defaultEventBasedHold,omitempty"`
 		Versioning            bucketVersioning `json:"versioning,omitempty"`
+		CORS                  []corsRule       `json:"cors,omitempty"`
 	}
 	err := json.NewDecoder(body).Decode(&data)
 	if err != nil {
 		panic(err)
 	}
+
+	// Convert CORS rules to backend format
+	var corsRules []backend.BucketCORS
+	if data.CORS != nil {
+		corsRules = make([]backend.BucketCORS, len(data.CORS))
+		for i, c := range data.CORS {
+			corsRules[i] = backend.BucketCORS{
+				MaxAge:          c.MaxAgeSeconds,
+				Methods:         c.Method,
+				Origins:         c.Origin,
+				ResponseHeaders: c.ResponseHeader,
+			}
+		}
+	}
+
 	attrsToUpdate := backend.BucketAttrs{
 		DefaultEventBasedHold: data.DefaultEventBasedHold,
 		VersioningEnabled:     data.Versioning.Enabled,
+		CORS:                  corsRules,
 	}
 	return attrsToUpdate
 }
@@ -78,6 +95,14 @@ func (s *Server) CreateBucketWithOpts(opts CreateBucketOpts) {
 	}
 }
 
+// corsRule represents a CORS rule from the API request.
+type corsRule struct {
+	MaxAgeSeconds  int64    `json:"maxAgeSeconds,omitempty"`
+	Method         []string `json:"method,omitempty"`
+	Origin         []string `json:"origin,omitempty"`
+	ResponseHeader []string `json:"responseHeader,omitempty"`
+}
+
 func (s *Server) createBucketByPost(r *http.Request) jsonResponse {
 	// Minimal version of Bucket from google.golang.org/api/storage/v1
 
@@ -85,6 +110,7 @@ func (s *Server) createBucketByPost(r *http.Request) jsonResponse {
 		Name                  string            `json:"name,omitempty"`
 		Versioning            *bucketVersioning `json:"versioning,omitempty"`
 		DefaultEventBasedHold bool              `json:"defaultEventBasedHold,omitempty"`
+		CORS                  []corsRule        `json:"cors,omitempty"`
 	}
 
 	// Read the bucket props from the request body JSON
@@ -98,6 +124,18 @@ func (s *Server) createBucketByPost(r *http.Request) jsonResponse {
 		versioning = data.Versioning.Enabled
 	}
 	defaultEventBasedHold := data.DefaultEventBasedHold
+
+	// Convert CORS rules to backend format
+	corsRules := make([]backend.BucketCORS, len(data.CORS))
+	for i, c := range data.CORS {
+		corsRules[i] = backend.BucketCORS{
+			MaxAge:          c.MaxAgeSeconds,
+			Methods:         c.Method,
+			Origins:         c.Origin,
+			ResponseHeaders: c.ResponseHeader,
+		}
+	}
+
 	if err := validateBucketName(name); err != nil {
 		return jsonResponse{errorMessage: err.Error(), status: http.StatusBadRequest}
 	}
@@ -115,7 +153,11 @@ func (s *Server) createBucketByPost(r *http.Request) jsonResponse {
 	}
 
 	// Create the named bucket
-	if err := s.backend.CreateBucket(name, backend.BucketAttrs{VersioningEnabled: versioning, DefaultEventBasedHold: defaultEventBasedHold}); err != nil {
+	if err := s.backend.CreateBucket(name, backend.BucketAttrs{
+		VersioningEnabled:     versioning,
+		DefaultEventBasedHold: defaultEventBasedHold,
+		CORS:                  corsRules,
+	}); err != nil {
 		return jsonResponse{errorMessage: err.Error()}
 	}
 

@@ -356,3 +356,102 @@ func TestServerClientListObjects(t *testing.T) {
 		})
 	}
 }
+
+func TestServerClientBucketCORS(t *testing.T) {
+	t.Run("create bucket with CORS and retrieve it", func(t *testing.T) {
+		runServersTest(t, runServersOptions{enableFSBackend: true}, func(t *testing.T, server *Server) {
+			const bucketName = "bucket-with-cors"
+			client := server.Client()
+
+			corsConfig := []storage.CORS{
+				{
+					Origins:         []string{"https://example.com", "https://app.example.com"},
+					Methods:         []string{"GET", "PUT", "POST"},
+					ResponseHeaders: []string{"Content-Type", "X-Custom-Header"},
+					MaxAge:          time.Hour,
+				},
+			}
+
+			bucketAttrs := storage.BucketAttrs{
+				CORS: corsConfig,
+			}
+
+			if err := client.Bucket(bucketName).Create(context.Background(), "test-project", &bucketAttrs); err != nil {
+				t.Fatalf("failed to create bucket: %v", err)
+			}
+
+			attrs, err := client.Bucket(bucketName).Attrs(context.Background())
+			if err != nil {
+				t.Fatalf("failed to get bucket attrs: %v", err)
+			}
+
+			if len(attrs.CORS) != 1 {
+				t.Fatalf("expected 1 CORS rule, got %d", len(attrs.CORS))
+			}
+
+			cors := attrs.CORS[0]
+
+			if len(cors.Origins) != 2 {
+				t.Errorf("expected 2 origins, got %d", len(cors.Origins))
+			}
+			if cors.Origins[0] != "https://example.com" {
+				t.Errorf("expected first origin to be 'https://example.com', got %q", cors.Origins[0])
+			}
+			if cors.Origins[1] != "https://app.example.com" {
+				t.Errorf("expected second origin to be 'https://app.example.com', got %q", cors.Origins[1])
+			}
+
+			if len(cors.Methods) != 3 {
+				t.Errorf("expected 3 methods, got %d", len(cors.Methods))
+			}
+
+			if len(cors.ResponseHeaders) != 2 {
+				t.Errorf("expected 2 response headers, got %d", len(cors.ResponseHeaders))
+			}
+
+			if cors.MaxAge != time.Hour {
+				t.Errorf("expected MaxAge of 1 hour, got %v", cors.MaxAge)
+			}
+		})
+	})
+
+	t.Run("update bucket CORS", func(t *testing.T) {
+		runServersTest(t, runServersOptions{enableFSBackend: true}, func(t *testing.T, server *Server) {
+			const bucketName = "bucket-update-cors"
+			client := server.Client()
+
+			// Create bucket without CORS
+			if err := client.Bucket(bucketName).Create(context.Background(), "test-project", nil); err != nil {
+				t.Fatalf("failed to create bucket: %v", err)
+			}
+
+			// Update with CORS
+			corsConfig := []storage.CORS{
+				{
+					Origins: []string{"https://updated.example.com"},
+					Methods: []string{"GET"},
+				},
+			}
+
+			_, err := client.Bucket(bucketName).Update(context.Background(), storage.BucketAttrsToUpdate{
+				CORS: corsConfig,
+			})
+			if err != nil {
+				t.Fatalf("failed to update bucket: %v", err)
+			}
+
+			attrs, err := client.Bucket(bucketName).Attrs(context.Background())
+			if err != nil {
+				t.Fatalf("failed to get bucket attrs: %v", err)
+			}
+
+			if len(attrs.CORS) != 1 {
+				t.Fatalf("expected 1 CORS rule after update, got %d", len(attrs.CORS))
+			}
+
+			if attrs.CORS[0].Origins[0] != "https://updated.example.com" {
+				t.Errorf("expected origin 'https://updated.example.com', got %q", attrs.CORS[0].Origins[0])
+			}
+		})
+	})
+}

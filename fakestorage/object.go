@@ -99,7 +99,10 @@ func (o ObjectAttrs) MarshalJSON() ([]byte, error) {
 		Generation:         o.Generation,
 		Metadata:           o.Metadata,
 	}
-	temp.ACL = make([]aclRule, len(o.ACL))
+	temp.ACL = make(
+		[]aclRule,
+		len(o.ACL),
+	)
 	for i, ACL := range o.ACL {
 		temp.ACL[i] = aclRule(ACL)
 	}
@@ -109,7 +112,10 @@ func (o ObjectAttrs) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON for ObjectAttrs to use ACLRule instead of storage.ACLRule
 func (o *ObjectAttrs) UnmarshalJSON(data []byte) error {
 	var temp jsonObject
-	if err := json.Unmarshal(data, &temp); err != nil {
+	if err := json.Unmarshal(
+		data,
+		&temp,
+	); err != nil {
 		return err
 	}
 	o.BucketName = temp.BucketName
@@ -129,7 +135,10 @@ func (o *ObjectAttrs) UnmarshalJSON(data []byte) error {
 	o.Generation = temp.Generation
 	o.Metadata = temp.Metadata
 	o.CustomTime = temp.CustomTime
-	o.ACL = make([]storage.ACLRule, len(temp.ACL))
+	o.ACL = make(
+		[]storage.ACLRule,
+		len(temp.ACL),
+	)
 	for i, ACL := range temp.ACL {
 		o.ACL[i] = storage.ACLRule(ACL)
 	}
@@ -217,7 +226,10 @@ func (acl *aclRule) UnmarshalJSON(data []byte) error {
 		Email       string            `json:"email"`
 		ProjectTeam *projectTeam      `json:"projectTeam"`
 	}{}
-	if err := json.Unmarshal(data, &temp); err != nil {
+	if err := json.Unmarshal(
+		data,
+		&temp,
+	); err != nil {
 		return err
 	}
 	acl.Entity = temp.Entity
@@ -247,7 +259,10 @@ func (team *projectTeam) UnmarshalJSON(data []byte) error {
 		ProjectNumber string `json:"projectNumber"`
 		Team          string `json:"team"`
 	}{}
-	if err := json.Unmarshal(data, &temp); err != nil {
+	if err := json.Unmarshal(
+		data,
+		&temp,
+	); err != nil {
 		return err
 	}
 	team.ProjectNumber = temp.ProjectNumber
@@ -271,7 +286,10 @@ func (s *Server) CreateObject(obj Object) {
 // If the bucket within the object doesn't exist, it also creates it. If the
 // object already exists, it overwrites the object.
 func (s *Server) CreateObjectStreaming(obj StreamingObject) error {
-	obj, err := s.createObject(obj, backend.NoConditions{})
+	obj, err := s.createObject(
+		obj,
+		backend.NoConditions{},
+	)
 	if err != nil {
 		return err
 	}
@@ -280,7 +298,10 @@ func (s *Server) CreateObjectStreaming(obj StreamingObject) error {
 }
 
 func (s *Server) createObject(obj StreamingObject, conditions backend.Conditions) (StreamingObject, error) {
-	oldBackendObj, err := s.backend.GetObject(obj.BucketName, obj.Name)
+	oldBackendObj, err := s.backend.GetObject(
+		obj.BucketName,
+		obj.Name,
+	)
 	// Calling Close before checking err is okay on objects, and the object
 	// may need to be closed whether or not there's an error.
 	defer oldBackendObj.Close() //lint:ignore SA5001 // see above
@@ -288,7 +309,10 @@ func (s *Server) createObject(obj StreamingObject, conditions backend.Conditions
 	prevVersionExisted := err == nil
 
 	// The caller is responsible for closing the created object.
-	newBackendObj, err := s.backend.CreateObject(toBackendObjects([]StreamingObject{obj})[0], conditions)
+	newBackendObj, err := s.backend.CreateObject(
+		toBackendObjects([]StreamingObject{obj})[0],
+		conditions,
+	)
 	if err != nil {
 		return StreamingObject{}, err
 	}
@@ -296,23 +320,41 @@ func (s *Server) createObject(obj StreamingObject, conditions backend.Conditions
 	var newObjEventAttr map[string]string
 	if prevVersionExisted {
 		newObjEventAttr = map[string]string{
-			"overwroteGeneration": strconv.FormatInt(oldBackendObj.Generation, 10),
+			"overwroteGeneration": strconv.FormatInt(
+				oldBackendObj.Generation,
+				10,
+			),
 		}
 
 		oldObjEventAttr := map[string]string{
-			"overwrittenByGeneration": strconv.FormatInt(newBackendObj.Generation, 10),
+			"overwrittenByGeneration": strconv.FormatInt(
+				newBackendObj.Generation,
+				10,
+			),
 		}
 
 		bucket, _ := s.backend.GetBucket(obj.BucketName)
 		if bucket.VersioningEnabled {
-			s.eventManager.Trigger(&oldBackendObj, notification.EventArchive, oldObjEventAttr)
+			s.eventManager.Trigger(
+				&oldBackendObj,
+				notification.EventArchive,
+				oldObjEventAttr,
+			)
 		} else {
-			s.eventManager.Trigger(&oldBackendObj, notification.EventDelete, oldObjEventAttr)
+			s.eventManager.Trigger(
+				&oldBackendObj,
+				notification.EventDelete,
+				oldObjEventAttr,
+			)
 		}
 	}
 
 	newObj := fromBackendObjects([]backend.StreamingObject{newBackendObj})[0]
-	s.eventManager.Trigger(&newBackendObj, notification.EventFinalize, newObjEventAttr)
+	s.eventManager.Trigger(
+		&newBackendObj,
+		notification.EventFinalize,
+		newObjEventAttr,
+	)
 	return newObj, nil
 }
 
@@ -331,47 +373,92 @@ type ListOptions struct {
 //
 // Deprecated: use ListObjectsWithOptions.
 func (s *Server) ListObjects(bucketName, prefix, delimiter string, versions bool) ([]ObjectAttrs, []string, error) {
-	return s.ListObjectsWithOptions(bucketName, ListOptions{
-		Prefix:    prefix,
-		Delimiter: delimiter,
-		Versions:  versions,
-	})
+	return s.ListObjectsWithOptions(
+		bucketName,
+		ListOptions{
+			Prefix:    prefix,
+			Delimiter: delimiter,
+			Versions:  versions,
+		},
+	)
 }
 
 func (s *Server) ListObjectsWithOptions(bucketName string, options ListOptions) ([]ObjectAttrs, []string, error) {
-	backendObjects, err := s.backend.ListObjects(bucketName, options.Prefix, options.Versions)
+	backendObjects, err := s.backend.ListObjects(
+		bucketName,
+		options.Prefix,
+		options.Versions,
+	)
 	if err != nil {
 		return nil, nil, err
 	}
 	objects := fromBackendObjectsAttrs(backendObjects)
-	slices.SortFunc(objects, func(left, right ObjectAttrs) int {
-		return strings.Compare(left.Name, right.Name)
-	})
+	slices.SortFunc(
+		objects,
+		func(left, right ObjectAttrs) int {
+			return strings.Compare(
+				left.Name,
+				right.Name,
+			)
+		},
+	)
 	var respObjects []ObjectAttrs
 	prefixes := make(map[string]bool)
 	for _, obj := range objects {
-		if !strings.HasPrefix(obj.Name, options.Prefix) {
+		if !strings.HasPrefix(
+			obj.Name,
+			options.Prefix,
+		) {
 			continue
 		}
-		objName := strings.Replace(obj.Name, options.Prefix, "", 1)
-		delimPos := strings.Index(objName, options.Delimiter)
+		objName := strings.Replace(
+			obj.Name,
+			options.Prefix,
+			"",
+			1,
+		)
+		delimPos := strings.Index(
+			objName,
+			options.Delimiter,
+		)
 		if options.Delimiter != "" && delimPos > -1 {
 			prefix := obj.Name[:len(options.Prefix)+delimPos+1]
-			if isInOffset(prefix, options.StartOffset, options.EndOffset) {
+			if isInOffset(
+				prefix,
+				options.StartOffset,
+				options.EndOffset,
+			) {
 				prefixes[prefix] = true
 			}
 			if options.IncludeTrailingDelimiter && obj.Name == prefix {
-				respObjects = append(respObjects, obj)
+				respObjects = append(
+					respObjects,
+					obj,
+				)
 			}
 		} else {
-			if isInOffset(obj.Name, options.StartOffset, options.EndOffset) {
-				respObjects = append(respObjects, obj)
+			if isInOffset(
+				obj.Name,
+				options.StartOffset,
+				options.EndOffset,
+			) {
+				respObjects = append(
+					respObjects,
+					obj,
+				)
 			}
 		}
 	}
-	respPrefixes := make([]string, 0, len(prefixes))
+	respPrefixes := make(
+		[]string,
+		0,
+		len(prefixes),
+	)
 	for p := range prefixes {
-		respPrefixes = append(respPrefixes, p)
+		respPrefixes = append(
+			respPrefixes,
+			p,
+		)
 	}
 	sort.Strings(respPrefixes)
 	if options.MaxResults != 0 && len(respObjects) > options.MaxResults {
@@ -382,11 +469,23 @@ func (s *Server) ListObjectsWithOptions(bucketName string, options ListOptions) 
 
 func isInOffset(name, startOffset, endOffset string) bool {
 	if endOffset != "" && startOffset != "" {
-		return strings.Compare(name, endOffset) < 0 && strings.Compare(name, startOffset) >= 0
+		return strings.Compare(
+			name,
+			endOffset,
+		) < 0 && strings.Compare(
+			name,
+			startOffset,
+		) >= 0
 	} else if endOffset != "" {
-		return strings.Compare(name, endOffset) < 0
+		return strings.Compare(
+			name,
+			endOffset,
+		) < 0
 	} else if startOffset != "" {
-		return strings.Compare(name, startOffset) >= 0
+		return strings.Compare(
+			name,
+			startOffset,
+		) >= 0
 	} else {
 		return true
 	}
@@ -400,68 +499,125 @@ func getCurrentIfZero(date time.Time) time.Time {
 }
 
 func toBackendObjects(objects []StreamingObject) []backend.StreamingObject {
-	backendObjects := make([]backend.StreamingObject, 0, len(objects))
+	backendObjects := make(
+		[]backend.StreamingObject,
+		0,
+		len(objects),
+	)
 	for _, o := range objects {
-		backendObjects = append(backendObjects, backend.StreamingObject{
-			ObjectAttrs: backend.ObjectAttrs{
-				BucketName:         o.BucketName,
-				Name:               o.Name,
-				StorageClass:       o.StorageClass,
-				ContentType:        o.ContentType,
-				ContentEncoding:    o.ContentEncoding,
-				ContentDisposition: o.ContentDisposition,
-				ContentLanguage:    o.ContentLanguage,
-				CacheControl:       o.CacheControl,
-				ACL:                o.ACL,
-				Created:            getCurrentIfZero(o.Created).Format(timestampFormat),
-				Deleted:            o.Deleted.Format(timestampFormat),
-				Updated:            getCurrentIfZero(o.Updated).Format(timestampFormat),
-				CustomTime:         o.CustomTime.Format(timestampFormat),
-				Generation:         o.Generation,
-				Metadata:           o.Metadata,
+		backendObjects = append(
+			backendObjects,
+			backend.StreamingObject{
+				ObjectAttrs: backend.ObjectAttrs{
+					BucketName:         o.BucketName,
+					Name:               o.Name,
+					StorageClass:       o.StorageClass,
+					ContentType:        o.ContentType,
+					ContentEncoding:    o.ContentEncoding,
+					ContentDisposition: o.ContentDisposition,
+					ContentLanguage:    o.ContentLanguage,
+					CacheControl:       o.CacheControl,
+					ACL:                o.ACL,
+					Created:            getCurrentIfZero(o.Created).Format(timestampFormat),
+					Deleted:            o.Deleted.Format(timestampFormat),
+					Updated:            getCurrentIfZero(o.Updated).Format(timestampFormat),
+					CustomTime:         o.CustomTime.Format(timestampFormat),
+					Generation:         o.Generation,
+					Metadata:           o.Metadata,
+				},
+				Content: o.Content,
 			},
-			Content: o.Content,
-		})
+		)
 	}
 	return backendObjects
 }
 
 func bufferedObjectsToBackendObjects(objects []Object) []backend.StreamingObject {
-	backendObjects := make([]backend.StreamingObject, 0, len(objects))
+	backendObjects := make(
+		[]backend.StreamingObject,
+		0,
+		len(objects),
+	)
 	for _, bufferedObject := range objects {
 		o := bufferedObject.StreamingObject()
-		backendObjects = append(backendObjects, backend.StreamingObject{
-			ObjectAttrs: backend.ObjectAttrs{
-				BucketName:         o.BucketName,
-				Name:               o.Name,
-				StorageClass:       o.StorageClass,
-				ContentType:        o.ContentType,
-				ContentEncoding:    o.ContentEncoding,
-				ContentDisposition: o.ContentDisposition,
-				ContentLanguage:    o.ContentLanguage,
-				ACL:                o.ACL,
-				Created:            getCurrentIfZero(o.Created).Format(timestampFormat),
-				Deleted:            o.Deleted.Format(timestampFormat),
-				Updated:            getCurrentIfZero(o.Updated).Format(timestampFormat),
-				CustomTime:         o.CustomTime.Format(timestampFormat),
-				Generation:         o.Generation,
-				Metadata:           o.Metadata,
-				Crc32c:             o.Crc32c,
-				Md5Hash:            o.Md5Hash,
-				Size:               o.Size,
-				Etag:               o.Etag,
+		backendObjects = append(
+			backendObjects,
+			backend.StreamingObject{
+				ObjectAttrs: backend.ObjectAttrs{
+					BucketName:         o.BucketName,
+					Name:               o.Name,
+					StorageClass:       o.StorageClass,
+					ContentType:        o.ContentType,
+					ContentEncoding:    o.ContentEncoding,
+					ContentDisposition: o.ContentDisposition,
+					ContentLanguage:    o.ContentLanguage,
+					ACL:                o.ACL,
+					Created:            getCurrentIfZero(o.Created).Format(timestampFormat),
+					Deleted:            o.Deleted.Format(timestampFormat),
+					Updated:            getCurrentIfZero(o.Updated).Format(timestampFormat),
+					CustomTime:         o.CustomTime.Format(timestampFormat),
+					Generation:         o.Generation,
+					Metadata:           o.Metadata,
+					Crc32c:             o.Crc32c,
+					Md5Hash:            o.Md5Hash,
+					Size:               o.Size,
+					Etag:               o.Etag,
+				},
+				Content: o.Content,
 			},
-			Content: o.Content,
-		})
+		)
 	}
 	return backendObjects
 }
 
 func fromBackendObjects(objects []backend.StreamingObject) []StreamingObject {
-	backendObjects := make([]StreamingObject, 0, len(objects))
+	backendObjects := make(
+		[]StreamingObject,
+		0,
+		len(objects),
+	)
 	for _, o := range objects {
-		backendObjects = append(backendObjects, StreamingObject{
-			ObjectAttrs: ObjectAttrs{
+		backendObjects = append(
+			backendObjects,
+			StreamingObject{
+				ObjectAttrs: ObjectAttrs{
+					BucketName:         o.BucketName,
+					Name:               o.Name,
+					Size:               o.Size,
+					StorageClass:       o.StorageClass,
+					ContentType:        o.ContentType,
+					ContentEncoding:    o.ContentEncoding,
+					ContentDisposition: o.ContentDisposition,
+					ContentLanguage:    o.ContentLanguage,
+					CacheControl:       o.CacheControl,
+					Crc32c:             o.Crc32c,
+					Md5Hash:            o.Md5Hash,
+					Etag:               o.Etag,
+					ACL:                o.ACL,
+					Created:            convertTimeWithoutError(o.Created),
+					Deleted:            convertTimeWithoutError(o.Deleted),
+					Updated:            convertTimeWithoutError(o.Updated),
+					CustomTime:         convertTimeWithoutError(o.CustomTime),
+					Generation:         o.Generation,
+					Metadata:           o.Metadata,
+				},
+				Content: o.Content,
+			},
+		)
+	}
+	return backendObjects
+}
+
+func fromBackendObjectsAttrs(objectAttrs []backend.ObjectAttrs) []ObjectAttrs {
+	oattrs := make(
+		[]ObjectAttrs,
+		0,
+		len(objectAttrs),
+	)
+	for _, o := range objectAttrs {
+		oattrs = append(
+			oattrs,
+			ObjectAttrs{
 				BucketName:         o.BucketName,
 				Name:               o.Name,
 				Size:               o.Size,
@@ -482,48 +638,25 @@ func fromBackendObjects(objects []backend.StreamingObject) []StreamingObject {
 				Generation:         o.Generation,
 				Metadata:           o.Metadata,
 			},
-			Content: o.Content,
-		})
-	}
-	return backendObjects
-}
-
-func fromBackendObjectsAttrs(objectAttrs []backend.ObjectAttrs) []ObjectAttrs {
-	oattrs := make([]ObjectAttrs, 0, len(objectAttrs))
-	for _, o := range objectAttrs {
-		oattrs = append(oattrs, ObjectAttrs{
-			BucketName:         o.BucketName,
-			Name:               o.Name,
-			Size:               o.Size,
-			StorageClass:       o.StorageClass,
-			ContentType:        o.ContentType,
-			ContentEncoding:    o.ContentEncoding,
-			ContentDisposition: o.ContentDisposition,
-			ContentLanguage:    o.ContentLanguage,
-			CacheControl:       o.CacheControl,
-			Crc32c:             o.Crc32c,
-			Md5Hash:            o.Md5Hash,
-			Etag:               o.Etag,
-			ACL:                o.ACL,
-			Created:            convertTimeWithoutError(o.Created),
-			Deleted:            convertTimeWithoutError(o.Deleted),
-			Updated:            convertTimeWithoutError(o.Updated),
-			CustomTime:         convertTimeWithoutError(o.CustomTime),
-			Generation:         o.Generation,
-			Metadata:           o.Metadata,
-		})
+		)
 	}
 	return oattrs
 }
 
 func convertTimeWithoutError(t string) time.Time {
-	r, _ := time.Parse(timestampFormat, t)
+	r, _ := time.Parse(
+		timestampFormat,
+		t,
+	)
 	return r
 }
 
 // GetObject is the non-streaming version of GetObjectStreaming.
 func (s *Server) GetObject(bucketName, objectName string) (Object, error) {
-	streamingObject, err := s.GetObjectStreaming(bucketName, objectName)
+	streamingObject, err := s.GetObjectStreaming(
+		bucketName,
+		objectName,
+	)
 	if err != nil {
 		return Object{}, err
 	}
@@ -533,7 +666,10 @@ func (s *Server) GetObject(bucketName, objectName string) (Object, error) {
 // GetObjectStreaming returns the object with the given name in the given
 // bucket, or an error if the object doesn't exist.
 func (s *Server) GetObjectStreaming(bucketName, objectName string) (StreamingObject, error) {
-	backendObj, err := s.backend.GetObject(bucketName, objectName)
+	backendObj, err := s.backend.GetObject(
+		bucketName,
+		objectName,
+	)
 	if err != nil {
 		return StreamingObject{}, err
 	}
@@ -544,7 +680,11 @@ func (s *Server) GetObjectStreaming(bucketName, objectName string) (StreamingObj
 // GetObjectWithGeneration is the non-streaming version of
 // GetObjectWithGenerationStreaming.
 func (s *Server) GetObjectWithGeneration(bucketName, objectName string, generation int64) (Object, error) {
-	streamingObject, err := s.GetObjectWithGenerationStreaming(bucketName, objectName, generation)
+	streamingObject, err := s.GetObjectWithGenerationStreaming(
+		bucketName,
+		objectName,
+		generation,
+	)
 	if err != nil {
 		return Object{}, err
 	}
@@ -557,7 +697,11 @@ func (s *Server) GetObjectWithGeneration(bucketName, objectName string, generati
 //
 // If versioning is enabled, archived versions are considered.
 func (s *Server) GetObjectWithGenerationStreaming(bucketName, objectName string, generation int64) (StreamingObject, error) {
-	backendObj, err := s.backend.GetObjectWithGeneration(bucketName, objectName, generation)
+	backendObj, err := s.backend.GetObjectWithGeneration(
+		bucketName,
+		objectName,
+		generation,
+	)
 	if err != nil {
 		return StreamingObject{}, err
 	}
@@ -566,13 +710,24 @@ func (s *Server) GetObjectWithGenerationStreaming(bucketName, objectName string,
 }
 
 func (s *Server) objectWithGenerationOnValidGeneration(bucketName, objectName, generationStr string) (StreamingObject, error) {
-	generation, err := strconv.ParseInt(generationStr, 10, 64)
+	generation, err := strconv.ParseInt(
+		generationStr,
+		10,
+		64,
+	)
 	if err != nil && generationStr != "" {
 		return StreamingObject{}, errInvalidGeneration
 	} else if generation > 0 {
-		return s.GetObjectWithGenerationStreaming(bucketName, objectName, generation)
+		return s.GetObjectWithGenerationStreaming(
+			bucketName,
+			objectName,
+			generation,
+		)
 	}
-	return s.GetObjectStreaming(bucketName, objectName)
+	return s.GetObjectStreaming(
+		bucketName,
+		objectName,
+	)
 }
 
 func (s *Server) listObjects(r *http.Request) jsonResponse {
@@ -585,19 +740,26 @@ func (s *Server) listObjects(r *http.Request) jsonResponse {
 			return jsonResponse{status: http.StatusBadRequest}
 		}
 	}
-	objs, prefixes, err := s.ListObjectsWithOptions(bucketName, ListOptions{
-		Prefix:                   r.URL.Query().Get("prefix"),
-		Delimiter:                r.URL.Query().Get("delimiter"),
-		Versions:                 r.URL.Query().Get("versions") == "true",
-		StartOffset:              r.URL.Query().Get("startOffset"),
-		EndOffset:                r.URL.Query().Get("endOffset"),
-		IncludeTrailingDelimiter: r.URL.Query().Get("includeTrailingDelimiter") == "true",
-		MaxResults:               maxResults,
-	})
+	objs, prefixes, err := s.ListObjectsWithOptions(
+		bucketName,
+		ListOptions{
+			Prefix:                   r.URL.Query().Get("prefix"),
+			Delimiter:                r.URL.Query().Get("delimiter"),
+			Versions:                 r.URL.Query().Get("versions") == "true",
+			StartOffset:              r.URL.Query().Get("startOffset"),
+			EndOffset:                r.URL.Query().Get("endOffset"),
+			IncludeTrailingDelimiter: r.URL.Query().Get("includeTrailingDelimiter") == "true",
+			MaxResults:               maxResults,
+		},
+	)
 	if err != nil {
 		return jsonResponse{status: http.StatusNotFound}
 	}
-	return jsonResponse{data: newListObjectsResponse(objs, prefixes, s.externalURL)}
+	return jsonResponse{data: newListObjectsResponse(
+		objs,
+		prefixes,
+		s.externalURL,
+	)}
 }
 
 func (s *Server) xmlListObjects(r *http.Request) xmlResponse {
@@ -609,7 +771,10 @@ func (s *Server) xmlListObjects(r *http.Request) xmlResponse {
 		Versions:  r.URL.Query().Get("versions") == "true",
 	}
 
-	objs, prefixes, err := s.ListObjectsWithOptions(bucketName, opts)
+	objs, prefixes, err := s.ListObjectsWithOptions(
+		bucketName,
+		opts,
+	)
 	if err != nil {
 		return xmlResponse{
 			status:       http.StatusInternalServerError,
@@ -626,18 +791,24 @@ func (s *Server) xmlListObjects(r *http.Request) xmlResponse {
 
 	if opts.Delimiter != "" {
 		for _, prefix := range prefixes {
-			result.CommonPrefixes = append(result.CommonPrefixes, CommonPrefix{Prefix: prefix})
+			result.CommonPrefixes = append(
+				result.CommonPrefixes,
+				CommonPrefix{Prefix: prefix},
+			)
 		}
 	}
 
 	for _, obj := range objs {
-		result.Contents = append(result.Contents, Contents{
-			Key:          obj.Name,
-			Generation:   obj.Generation,
-			Size:         obj.Size,
-			LastModified: obj.Updated.Format(time.RFC3339),
-			ETag:         ETag{Value: obj.Etag},
-		})
+		result.Contents = append(
+			result.Contents,
+			Contents{
+				Key:          obj.Name,
+				Generation:   obj.Generation,
+				Size:         obj.Size,
+				LastModified: obj.Updated.Format(time.RFC3339),
+				ETag:         ETag{Value: obj.Etag},
+			},
+		)
 	}
 
 	raw, err := xml.Marshal(result)
@@ -656,63 +827,94 @@ func (s *Server) xmlListObjects(r *http.Request) xmlResponse {
 
 func (s *Server) getObject(w http.ResponseWriter, r *http.Request) {
 	if alt := r.URL.Query().Get("alt"); alt == "media" || r.Method == http.MethodHead {
-		s.downloadObject(w, r)
+		s.downloadObject(
+			w,
+			r,
+		)
 		return
 	}
 
-	handler := jsonToHTTPHandler(func(r *http.Request) jsonResponse {
-		vars := unescapeMuxVars(mux.Vars(r))
+	handler := jsonToHTTPHandler(
+		func(r *http.Request) jsonResponse {
+			vars := unescapeMuxVars(mux.Vars(r))
 
-		projection := storage.ProjectionNoACL
-		if r.URL.Query().Has("projection") {
-			switch value := strings.ToLower(r.URL.Query().Get("projection")); value {
-			case "full":
-				projection = storage.ProjectionFull
-			case "noacl":
-				projection = storage.ProjectionNoACL
-			default:
-				return jsonResponse{
-					status:       http.StatusBadRequest,
-					errorMessage: fmt.Sprintf("invalid projection: %q", value),
+			projection := storage.ProjectionNoACL
+			if r.URL.Query().Has("projection") {
+				switch value := strings.ToLower(r.URL.Query().Get("projection")); value {
+				case "full":
+					projection = storage.ProjectionFull
+				case "noacl":
+					projection = storage.ProjectionNoACL
+				default:
+					return jsonResponse{
+						status: http.StatusBadRequest,
+						errorMessage: fmt.Sprintf(
+							"invalid projection: %q",
+							value,
+						),
+					}
 				}
 			}
-		}
 
-		obj, err := s.objectWithGenerationOnValidGeneration(vars["bucketName"], vars["objectName"], r.FormValue("generation"))
-		// Calling Close before checking err is okay on objects, and the object
-		// may need to be closed whether or not there's an error.
-		defer obj.Close() //lint:ignore SA5001 // see above
-		if err != nil {
-			statusCode := http.StatusNotFound
-			var errMessage string
-			if errors.Is(err, errInvalidGeneration) {
-				statusCode = http.StatusBadRequest
-				errMessage = err.Error()
+			obj, err := s.objectWithGenerationOnValidGeneration(
+				vars["bucketName"],
+				vars["objectName"],
+				r.FormValue("generation"),
+			)
+			// Calling Close before checking err is okay on objects, and the object
+			// may need to be closed whether or not there's an error.
+			defer obj.Close() //lint:ignore SA5001 // see above
+			if err != nil {
+				statusCode := http.StatusNotFound
+				var errMessage string
+				if errors.Is(
+					err,
+					errInvalidGeneration,
+				) {
+					statusCode = http.StatusBadRequest
+					errMessage = err.Error()
+				}
+				return jsonResponse{
+					status:       statusCode,
+					errorMessage: errMessage,
+				}
 			}
+			header := make(http.Header)
+			header.Set(
+				"Accept-Ranges",
+				"bytes",
+			)
 			return jsonResponse{
-				status:       statusCode,
-				errorMessage: errMessage,
+				header: header,
+				data: newProjectedObjectResponse(
+					obj.ObjectAttrs,
+					s.externalURL,
+					projection,
+				),
 			}
-		}
-		header := make(http.Header)
-		header.Set("Accept-Ranges", "bytes")
-		return jsonResponse{
-			header: header,
-			data:   newProjectedObjectResponse(obj.ObjectAttrs, s.externalURL, projection),
-		}
-	})
+		},
+	)
 
-	handler(w, r)
+	handler(
+		w,
+		r,
+	)
 }
 
 func (s *Server) deleteObject(r *http.Request) jsonResponse {
 	vars := unescapeMuxVars(mux.Vars(r))
-	obj, err := s.GetObjectStreaming(vars["bucketName"], vars["objectName"])
+	obj, err := s.GetObjectStreaming(
+		vars["bucketName"],
+		vars["objectName"],
+	)
 	// Calling Close before checking err is okay on objects, and the object
 	// may need to be closed whether or not there's an error.
 	defer obj.Close() //lint:ignore SA5001 // see above
 	if err == nil {
-		err = s.backend.DeleteObject(vars["bucketName"], vars["objectName"])
+		err = s.backend.DeleteObject(
+			vars["bucketName"],
+			vars["objectName"],
+		)
 	}
 	if err != nil {
 		return jsonResponse{status: http.StatusNotFound}
@@ -720,9 +922,17 @@ func (s *Server) deleteObject(r *http.Request) jsonResponse {
 	bucket, _ := s.backend.GetBucket(obj.BucketName)
 	backendObj := toBackendObjects([]StreamingObject{obj})[0]
 	if bucket.VersioningEnabled {
-		s.eventManager.Trigger(&backendObj, notification.EventArchive, nil)
+		s.eventManager.Trigger(
+			&backendObj,
+			notification.EventArchive,
+			nil,
+		)
 	} else {
-		s.eventManager.Trigger(&backendObj, notification.EventDelete, nil)
+		s.eventManager.Trigger(
+			&backendObj,
+			notification.EventDelete,
+			nil,
+		)
 	}
 	return jsonResponse{}
 }
@@ -730,7 +940,10 @@ func (s *Server) deleteObject(r *http.Request) jsonResponse {
 func (s *Server) listObjectACL(r *http.Request) jsonResponse {
 	vars := unescapeMuxVars(mux.Vars(r))
 
-	obj, err := s.GetObjectStreaming(vars["bucketName"], vars["objectName"])
+	obj, err := s.GetObjectStreaming(
+		vars["bucketName"],
+		vars["objectName"],
+	)
 	if err != nil {
 		return jsonResponse{status: http.StatusNotFound}
 	}
@@ -742,7 +955,10 @@ func (s *Server) listObjectACL(r *http.Request) jsonResponse {
 func (s *Server) deleteObjectACL(r *http.Request) jsonResponse {
 	vars := unescapeMuxVars(mux.Vars(r))
 
-	obj, err := s.GetObjectStreaming(vars["bucketName"], vars["objectName"])
+	obj, err := s.GetObjectStreaming(
+		vars["bucketName"],
+		vars["objectName"],
+	)
 	if err != nil {
 		return jsonResponse{status: http.StatusNotFound}
 	}
@@ -752,12 +968,18 @@ func (s *Server) deleteObjectACL(r *http.Request) jsonResponse {
 	var newAcls []storage.ACLRule
 	for _, aclRule := range obj.ObjectAttrs.ACL {
 		if entity != string(aclRule.Entity) {
-			newAcls = append(newAcls, aclRule)
+			newAcls = append(
+				newAcls,
+				aclRule,
+			)
 		}
 	}
 
 	obj.ACL = newAcls
-	obj, err = s.createObject(obj, backend.NoConditions{})
+	obj, err = s.createObject(
+		obj,
+		backend.NoConditions{},
+	)
 	if err != nil {
 		return errToJsonResponse(err)
 	}
@@ -769,7 +991,10 @@ func (s *Server) deleteObjectACL(r *http.Request) jsonResponse {
 func (s *Server) getObjectACL(r *http.Request) jsonResponse {
 	vars := unescapeMuxVars(mux.Vars(r))
 
-	obj, err := s.backend.GetObject(vars["bucketName"], vars["objectName"])
+	obj, err := s.backend.GetObject(
+		vars["bucketName"],
+		vars["objectName"],
+	)
 	if err != nil {
 		return jsonResponse{status: http.StatusNotFound}
 	}
@@ -795,7 +1020,10 @@ func (s *Server) getObjectACL(r *http.Request) jsonResponse {
 func (s *Server) setObjectACL(r *http.Request) jsonResponse {
 	vars := unescapeMuxVars(mux.Vars(r))
 
-	obj, err := s.GetObjectStreaming(vars["bucketName"], vars["objectName"])
+	obj, err := s.GetObjectStreaming(
+		vars["bucketName"],
+		vars["objectName"],
+	)
 	if err != nil {
 		return jsonResponse{status: http.StatusNotFound}
 	}
@@ -821,7 +1049,10 @@ func (s *Server) setObjectACL(r *http.Request) jsonResponse {
 		Role:   role,
 	}}
 
-	obj, err = s.createObject(obj, backend.NoConditions{})
+	obj, err = s.createObject(
+		obj,
+		backend.NoConditions{},
+	)
 	if err != nil {
 		return errToJsonResponse(err)
 	}
@@ -832,14 +1063,21 @@ func (s *Server) setObjectACL(r *http.Request) jsonResponse {
 
 func (s *Server) rewriteObject(r *http.Request) jsonResponse {
 	vars := unescapeMuxVars(mux.Vars(r))
-	obj, err := s.objectWithGenerationOnValidGeneration(vars["sourceBucket"], vars["sourceObject"], r.FormValue("sourceGeneration"))
+	obj, err := s.objectWithGenerationOnValidGeneration(
+		vars["sourceBucket"],
+		vars["sourceObject"],
+		r.FormValue("sourceGeneration"),
+	)
 	// Calling Close before checking err is okay on objects, and the object
 	// may need to be closed whether or not there's an error.
 	defer obj.Close() //lint:ignore SA5001 // see above
 	if err != nil {
 		statusCode := http.StatusNotFound
 		var errMessage string
-		if errors.Is(err, errInvalidGeneration) {
+		if errors.Is(
+			err,
+			errInvalidGeneration,
+		) {
 			statusCode = http.StatusBadRequest
 			errMessage = err.Error()
 		}
@@ -884,32 +1122,52 @@ func (s *Server) rewriteObject(r *http.Request) jsonResponse {
 		Content: obj.Content,
 	}
 
-	created, err := s.createObject(newObject, backend.NoConditions{})
+	created, err := s.createObject(
+		newObject,
+		backend.NoConditions{},
+	)
 	if err != nil {
 		return errToJsonResponse(err)
 	}
 	defer created.Close()
 
 	if vars["copyType"] == "copyTo" {
-		return jsonResponse{data: newObjectResponse(created.ObjectAttrs, s.externalURL)}
+		return jsonResponse{data: newObjectResponse(
+			created.ObjectAttrs,
+			s.externalURL,
+		)}
 	}
-	return jsonResponse{data: newObjectRewriteResponse(created.ObjectAttrs, s.externalURL)}
+	return jsonResponse{data: newObjectRewriteResponse(
+		created.ObjectAttrs,
+		s.externalURL,
+	)}
 }
 
 func (s *Server) downloadObject(w http.ResponseWriter, r *http.Request) {
 	vars := unescapeMuxVars(mux.Vars(r))
-	obj, err := s.objectWithGenerationOnValidGeneration(vars["bucketName"], vars["objectName"], r.FormValue("generation"))
+	obj, err := s.objectWithGenerationOnValidGeneration(
+		vars["bucketName"],
+		vars["objectName"],
+		r.FormValue("generation"),
+	)
 	// Calling Close before checking err is okay on objects, and the object
 	// may need to be closed whether or not there's an error.
 	defer obj.Close() //lint:ignore SA5001 // see above
 	if err != nil {
 		statusCode := http.StatusNotFound
 		message := http.StatusText(statusCode)
-		if errors.Is(err, errInvalidGeneration) {
+		if errors.Is(
+			err,
+			errInvalidGeneration,
+		) {
 			statusCode = http.StatusBadRequest
 			message = err.Error()
 		}
-		http.Error(w, message, statusCode)
+		http.Error(
+			w,
+			message,
+			statusCode,
+		)
 		return
 	}
 
@@ -929,7 +1187,10 @@ func (s *Server) downloadObject(w http.ResponseWriter, r *http.Request) {
 		// but we don't currently support that field.
 		// See https://cloud.google.com/storage/docs/transcoding
 
-		if obj.ContentEncoding == "gzip" && !strings.Contains(r.Header.Get("accept-encoding"), "gzip") {
+		if obj.ContentEncoding == "gzip" && !strings.Contains(
+			r.Header.Get("accept-encoding"),
+			"gzip",
+		) {
 			// GCS will transparently decompress gzipped content, see
 			// https://cloud.google.com/storage/docs/transcoding
 			// In this case, any Range header is ignored and the full content is returned.
@@ -952,54 +1213,141 @@ func (s *Server) downloadObject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !handledTranscoding() {
-		ranged, start, lastByte, satisfiable = s.handleRange(obj, r)
+		ranged, start, lastByte, satisfiable = s.handleRange(
+			obj,
+			r,
+		)
 		contentLength = lastByte - start + 1
 	}
 
 	if ranged && satisfiable {
-		_, err = obj.Content.Seek(start, io.SeekStart)
+		_, err = obj.Content.Seek(
+			start,
+			io.SeekStart,
+		)
 		if err != nil {
-			http.Error(w, "could not seek", http.StatusInternalServerError)
+			http.Error(
+				w,
+				"could not seek",
+				http.StatusInternalServerError,
+			)
 			return
 		}
-		content = io.LimitReader(obj.Content, contentLength)
+		content = io.LimitReader(
+			obj.Content,
+			contentLength,
+		)
 		status = http.StatusPartialContent
-		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, lastByte, obj.Size))
+		w.Header().Set(
+			"Content-Range",
+			fmt.Sprintf(
+				"bytes %d-%d/%d",
+				start,
+				lastByte,
+				obj.Size,
+			),
+		)
 	}
-	w.Header().Set("Accept-Ranges", "bytes")
-	w.Header().Set("Content-Length", strconv.FormatInt(contentLength, 10))
-	w.Header().Set("X-Goog-Generation", strconv.FormatInt(obj.Generation, 10))
-	w.Header().Set("X-Goog-Hash", fmt.Sprintf("crc32c=%s,md5=%s", obj.Crc32c, obj.Md5Hash))
-	w.Header().Set("Last-Modified", obj.Updated.Format(http.TimeFormat))
-	w.Header().Set("ETag", fmt.Sprintf("%q", obj.Etag))
+	w.Header().Set(
+		"Accept-Ranges",
+		"bytes",
+	)
+	w.Header().Set(
+		"Content-Length",
+		strconv.FormatInt(
+			contentLength,
+			10,
+		),
+	)
+	w.Header().Set(
+		"X-Goog-Generation",
+		strconv.FormatInt(
+			obj.Generation,
+			10,
+		),
+	)
+	w.Header().Set(
+		"X-Goog-Hash",
+		fmt.Sprintf(
+			"crc32c=%s,md5=%s",
+			obj.Crc32c,
+			obj.Md5Hash,
+		),
+	)
+	w.Header().Set(
+		"Last-Modified",
+		obj.Updated.Format(http.TimeFormat),
+	)
+	w.Header().Set(
+		"ETag",
+		fmt.Sprintf(
+			"%q",
+			obj.Etag,
+		),
+	)
 	for name, value := range obj.Metadata {
-		w.Header().Set("X-Goog-Meta-"+name, value)
+		w.Header().Set(
+			"X-Goog-Meta-"+name,
+			value,
+		)
 	}
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set(
+		"Access-Control-Allow-Origin",
+		"*",
+	)
 
 	if ranged && !satisfiable {
 		status = http.StatusRequestedRangeNotSatisfiable
-		content = bytes.NewReader([]byte(fmt.Sprintf(`<?xml version='1.0' encoding='UTF-8'?>`+
-			`<Error><Code>InvalidRange</Code>`+
-			`<Message>The requested range cannot be satisfied.</Message>`+
-			`<Details>%s</Details></Error>`, r.Header.Get("Range"))))
-		w.Header().Set(contentTypeHeader, "application/xml; charset=UTF-8")
+		content = bytes.NewReader(
+			[]byte(fmt.Sprintf(
+				`<?xml version='1.0' encoding='UTF-8'?>`+
+					`<Error><Code>InvalidRange</Code>`+
+					`<Message>The requested range cannot be satisfied.</Message>`+
+					`<Details>%s</Details></Error>`,
+				r.Header.Get("Range"),
+			)),
+		)
+		w.Header().Set(
+			contentTypeHeader,
+			"application/xml; charset=UTF-8",
+		)
 	} else {
 		if obj.ContentType != "" {
-			w.Header().Set(contentTypeHeader, obj.ContentType)
+			w.Header().Set(
+				contentTypeHeader,
+				obj.ContentType,
+			)
 		}
 		if obj.CacheControl != "" {
-			w.Header().Set(cacheControlHeader, obj.CacheControl)
+			w.Header().Set(
+				cacheControlHeader,
+				obj.CacheControl,
+			)
 		}
 		// If content was transcoded, the underlying encoding was removed so we shouldn't report it.
 		if obj.ContentEncoding != "" && !transcoded {
-			w.Header().Set("Content-Encoding", obj.ContentEncoding)
+			w.Header().Set(
+				"Content-Encoding",
+				obj.ContentEncoding,
+			)
 		}
-		if obj.ContentDisposition != "" {
-			w.Header().Set("Content-Disposition", obj.ContentDisposition)
+		// Support response-content-disposition query parameter (used in signed URLs)
+		if responseContentDisposition := r.URL.Query().Get("response-content-disposition"); responseContentDisposition != "" {
+			w.Header().Set(
+				"Content-Disposition",
+				responseContentDisposition,
+			)
+		} else if obj.ContentDisposition != "" {
+			w.Header().Set(
+				"Content-Disposition",
+				obj.ContentDisposition,
+			)
 		}
 		if obj.ContentLanguage != "" {
-			w.Header().Set("Content-Language", obj.ContentLanguage)
+			w.Header().Set(
+				"Content-Language",
+				obj.ContentLanguage,
+			)
 		}
 		// X-Goog-Stored-Content-Encoding must be set to the original encoding,
 		// defaulting to "identity" if no encoding was set.
@@ -1007,17 +1355,26 @@ func (s *Server) downloadObject(w http.ResponseWriter, r *http.Request) {
 		if obj.ContentEncoding != "" {
 			storedContentEncoding = obj.ContentEncoding
 		}
-		w.Header().Set("X-Goog-Stored-Content-Encoding", storedContentEncoding)
+		w.Header().Set(
+			"X-Goog-Stored-Content-Encoding",
+			storedContentEncoding,
+		)
 	}
 
 	w.WriteHeader(status)
 	if r.Method == http.MethodGet {
-		io.Copy(w, content)
+		io.Copy(
+			w,
+			content,
+		)
 	}
 }
 
 func (s *Server) handleRange(obj StreamingObject, r *http.Request) (ranged bool, start int64, lastByte int64, satisfiable bool) {
-	start, end, err := parseRange(r.Header.Get("Range"), obj.Size)
+	start, end, err := parseRange(
+		r.Header.Get("Range"),
+		obj.Size,
+	)
 	if err != nil {
 		// If the range isn't valid, GCS returns all content.
 		return false, 0, obj.Size - 1, false
@@ -1073,39 +1430,77 @@ func parseRange(rangeHeaderValue string, contentLength int64) (start int64, end 
 	// "bytes=-40"   (suffix length, offset from end of string)
 	//
 	// The unit MUST be "bytes".
-	parts := strings.SplitN(rangeHeaderValue, "=", 2)
+	parts := strings.SplitN(
+		rangeHeaderValue,
+		"=",
+		2,
+	)
 	if len(parts) != 2 {
-		return 0, 0, fmt.Errorf("expecting `=` in range header, got: %s", rangeHeaderValue)
+		return 0, 0, fmt.Errorf(
+			"expecting `=` in range header, got: %s",
+			rangeHeaderValue,
+		)
 	}
 	if parts[0] != "bytes" {
-		return 0, 0, fmt.Errorf("invalid range unit, expecting `bytes`, got: %s", parts[0])
+		return 0, 0, fmt.Errorf(
+			"invalid range unit, expecting `bytes`, got: %s",
+			parts[0],
+		)
 	}
 	rangeSpec := parts[1]
 	if len(rangeSpec) == 0 {
 		return 0, 0, errors.New("empty range")
 	}
 	if rangeSpec[0] == '-' {
-		offsetFromEnd, err := strconv.ParseInt(rangeSpec, 10, 64)
+		offsetFromEnd, err := strconv.ParseInt(
+			rangeSpec,
+			10,
+			64,
+		)
 		if err != nil {
-			return 0, 0, fmt.Errorf("invalid suffix length, got: %s", rangeSpec)
+			return 0, 0, fmt.Errorf(
+				"invalid suffix length, got: %s",
+				rangeSpec,
+			)
 		}
 		start = contentLength + offsetFromEnd
 		end = contentLength - 1
 	} else {
-		rangeParts := strings.SplitN(rangeSpec, "-", 2)
+		rangeParts := strings.SplitN(
+			rangeSpec,
+			"-",
+			2,
+		)
 		if len(rangeParts) != 2 {
-			return 0, 0, fmt.Errorf("only one range supported, got: %s", rangeSpec)
+			return 0, 0, fmt.Errorf(
+				"only one range supported, got: %s",
+				rangeSpec,
+			)
 		}
-		start, err = strconv.ParseInt(rangeParts[0], 10, 64)
+		start, err = strconv.ParseInt(
+			rangeParts[0],
+			10,
+			64,
+		)
 		if err != nil {
-			return 0, 0, fmt.Errorf("invalid range start, got: %s", rangeParts[0])
+			return 0, 0, fmt.Errorf(
+				"invalid range start, got: %s",
+				rangeParts[0],
+			)
 		}
 		if rangeParts[1] == "" {
 			end = contentLength - 1
 		} else {
-			end, err = strconv.ParseInt(rangeParts[1], 10, 64)
+			end, err = strconv.ParseInt(
+				rangeParts[1],
+				10,
+				64,
+			)
 			if err != nil {
-				return 0, 0, fmt.Errorf("invalid range end, got: %s", rangeParts[1])
+				return 0, 0, fmt.Errorf(
+					"invalid range end, got: %s",
+					rangeParts[1],
+				)
 			}
 		}
 	}
@@ -1152,11 +1547,18 @@ func (s *Server) patchObject(r *http.Request) jsonResponse {
 		attrsToUpdate.ACL = []storage.ACLRule{}
 		for _, aclData := range payload.Acl {
 			newAcl := storage.ACLRule{Entity: storage.ACLEntity(aclData.Entity), Role: storage.ACLRole(aclData.Role)}
-			attrsToUpdate.ACL = append(attrsToUpdate.ACL, newAcl)
+			attrsToUpdate.ACL = append(
+				attrsToUpdate.ACL,
+				newAcl,
+			)
 		}
 	}
 
-	backendObj, err := s.backend.PatchObject(bucketName, objectName, attrsToUpdate)
+	backendObj, err := s.backend.PatchObject(
+		bucketName,
+		objectName,
+		attrsToUpdate,
+	)
 	if err != nil {
 		return jsonResponse{
 			status:       http.StatusNotFound,
@@ -1165,7 +1567,11 @@ func (s *Server) patchObject(r *http.Request) jsonResponse {
 	}
 	defer backendObj.Close()
 
-	s.eventManager.Trigger(&backendObj, notification.EventMetadata, nil)
+	s.eventManager.Trigger(
+		&backendObj,
+		notification.EventMetadata,
+		nil,
+	)
 	return jsonResponse{data: fromBackendObjects([]backend.StreamingObject{backendObj})[0]}
 }
 
@@ -1206,10 +1612,17 @@ func (s *Server) updateObject(r *http.Request) jsonResponse {
 		attrsToUpdate.ACL = []storage.ACLRule{}
 		for _, aclData := range payload.Acl {
 			newAcl := storage.ACLRule{Entity: storage.ACLEntity(aclData.Entity), Role: storage.ACLRole(aclData.Role)}
-			attrsToUpdate.ACL = append(attrsToUpdate.ACL, newAcl)
+			attrsToUpdate.ACL = append(
+				attrsToUpdate.ACL,
+				newAcl,
+			)
 		}
 	}
-	backendObj, err := s.backend.UpdateObject(bucketName, objectName, attrsToUpdate)
+	backendObj, err := s.backend.UpdateObject(
+		bucketName,
+		objectName,
+		attrsToUpdate,
+	)
 	if err != nil {
 		return jsonResponse{
 			status:       http.StatusNotFound,
@@ -1218,7 +1631,11 @@ func (s *Server) updateObject(r *http.Request) jsonResponse {
 	}
 	defer backendObj.Close()
 
-	s.eventManager.Trigger(&backendObj, notification.EventMetadata, nil)
+	s.eventManager.Trigger(
+		&backendObj,
+		notification.EventMetadata,
+		nil,
+	)
 	return jsonResponse{data: fromBackendObjects([]backend.StreamingObject{backendObj})[0]}
 }
 
@@ -1252,17 +1669,36 @@ func (s *Server) composeObject(r *http.Request) jsonResponse {
 	const maxComposeObjects = 32
 	if len(composeRequest.SourceObjects) > maxComposeObjects {
 		return jsonResponse{
-			status:       http.StatusBadRequest,
-			errorMessage: fmt.Sprintf("The number of source components provided (%d) exceeds the maximum (%d)", len(composeRequest.SourceObjects), maxComposeObjects),
+			status: http.StatusBadRequest,
+			errorMessage: fmt.Sprintf(
+				"The number of source components provided (%d) exceeds the maximum (%d)",
+				len(composeRequest.SourceObjects),
+				maxComposeObjects,
+			),
 		}
 	}
 
-	sourceNames := make([]string, 0, len(composeRequest.SourceObjects))
+	sourceNames := make(
+		[]string,
+		0,
+		len(composeRequest.SourceObjects),
+	)
 	for _, n := range composeRequest.SourceObjects {
-		sourceNames = append(sourceNames, n.Name)
+		sourceNames = append(
+			sourceNames,
+			n.Name,
+		)
 	}
 
-	backendObj, err := s.backend.ComposeObject(bucketName, sourceNames, destinationObject, composeRequest.Destination.Metadata, composeRequest.Destination.ContentType, composeRequest.Destination.ContentDisposition, composeRequest.Destination.ContentLanguage)
+	backendObj, err := s.backend.ComposeObject(
+		bucketName,
+		sourceNames,
+		destinationObject,
+		composeRequest.Destination.Metadata,
+		composeRequest.Destination.ContentType,
+		composeRequest.Destination.ContentDisposition,
+		composeRequest.Destination.ContentLanguage,
+	)
 	if err != nil {
 		return jsonResponse{
 			status:       http.StatusInternalServerError,
@@ -1273,7 +1709,14 @@ func (s *Server) composeObject(r *http.Request) jsonResponse {
 
 	obj := fromBackendObjects([]backend.StreamingObject{backendObj})[0]
 
-	s.eventManager.Trigger(&backendObj, notification.EventFinalize, nil)
+	s.eventManager.Trigger(
+		&backendObj,
+		notification.EventFinalize,
+		nil,
+	)
 
-	return jsonResponse{data: newObjectResponse(obj.ObjectAttrs, s.externalURL)}
+	return jsonResponse{data: newObjectResponse(
+		obj.ObjectAttrs,
+		s.externalURL,
+	)}
 }

@@ -95,6 +95,10 @@ It is possible to use fake-gcs-server with signed URLs, although with a few cave
 - You need to configure fake-gcs-server to accept this local URL (by setting
   `-public-host`)
 
+### CORS and Content-Disposition support
+
+CORS configuration on buckets is supported - set via `BucketAttrs.CORS` and retrieve via bucket attributes. Content-Disposition is stored during uploads and returned in object attributes and download responses (supports `response-content-disposition` query param override).
+
 ### Available server flags
 
 fake-gcs-server supports various features that can be configured through flags

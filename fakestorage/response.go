@@ -54,13 +54,32 @@ type bucketResponse struct {
 	Etag                  string            `json:"etag"`
 	LocationType          string            `json:"locationType"`
 	SelfLink              string            `json:"selfLink,omitempty"`
+	CORS                  []corsResponse    `json:"cors,omitempty"`
 }
 
 type bucketVersioning struct {
 	Enabled bool `json:"enabled"`
 }
 
+// corsResponse represents CORS configuration in the API response format.
+type corsResponse struct {
+	MaxAgeSeconds   int64    `json:"maxAgeSeconds,omitempty"`
+	Method          []string `json:"method,omitempty"`
+	Origin          []string `json:"origin,omitempty"`
+	ResponseHeader  []string `json:"responseHeader,omitempty"`
+}
+
 func newBucketResponse(bucket backend.Bucket, location string, externalURL string) bucketResponse {
+	corsRules := make([]corsResponse, len(bucket.CORS))
+	for i, c := range bucket.CORS {
+		corsRules[i] = corsResponse{
+			MaxAgeSeconds:  c.MaxAge,
+			Method:         c.Methods,
+			Origin:         c.Origins,
+			ResponseHeader: c.ResponseHeaders,
+		}
+	}
+
 	return bucketResponse{
 		Kind:                  "storage#bucket",
 		ID:                    bucket.Name,
@@ -76,6 +95,7 @@ func newBucketResponse(bucket backend.Bucket, location string, externalURL strin
 		Etag:                  "RVRhZw==",
 		LocationType:          "region",
 		SelfLink:              fmt.Sprintf("%s/storage/v1/b/%s", externalURL, url.PathEscape(bucket.Name)),
+		CORS:                  corsRules,
 	}
 }
 

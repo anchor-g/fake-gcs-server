@@ -290,13 +290,14 @@ func (s *Server) signedUpload(bucketName string, r *http.Request) jsonResponse {
 
 	obj := StreamingObject{
 		ObjectAttrs: ObjectAttrs{
-			BucketName:      bucketName,
-			Name:            name,
-			ContentType:     r.Header.Get(contentTypeHeader),
-			ContentEncoding: contentEncoding,
-			CustomTime:      convertTimeWithoutError(customTime),
-			ACL:             getObjectACL(predefinedACL),
-			Metadata:        metaData,
+			BucketName:         bucketName,
+			Name:               name,
+			ContentType:        r.Header.Get(contentTypeHeader),
+			ContentEncoding:    contentEncoding,
+			ContentDisposition: r.Header.Get("Content-Disposition"),
+			CustomTime:         convertTimeWithoutError(customTime),
+			ACL:                getObjectACL(predefinedACL),
+			Metadata:           metaData,
 		},
 		Content: notImplementedSeeker{r.Body},
 	}
